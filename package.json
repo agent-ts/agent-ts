@@ -1,0 +1,7 @@
+{
+  "name": "agent-ts",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ]
+}
