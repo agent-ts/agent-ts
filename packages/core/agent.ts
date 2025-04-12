@@ -1,6 +1,6 @@
 import { type OpenAI } from "openai";
 import { type Tool } from "./tools";
-import { defaultSystemPrompt } from "./prompts";
+import { DEFAULT_SYSTEM_PROMPT, DEFAULT_MAX_ITERATIONS } from "./constants";
 import type { AgentOutputChunk, ToolCallRequest, TextChunk } from "./chunks";
 
 import {
@@ -68,44 +68,53 @@ const runAgenticIteration = async function* (
 
 export type Agent = (message: string) => AsyncGenerator<AgentOutputChunk>;
 
+/**
+ * Agent params
+ * @param tools tools the agent can call
+ * @param model model to use
+ * @param openAI openai client
+ * @param systemPrompt system prompt, could be a string or a function that modifies the default system prompt
+ * @param maxIterations maximum number of iterations
+ */
 export type AgentParams = {
   tools: Tool[];
   model: string;
   openAI: OpenAI;
   systemPrompt?: string;
+  maxIterations?: number;
 };
 
-export const makeAgent = ({
-  tools,
-  model,
-  openAI,
-  systemPrompt = defaultSystemPrompt,
-}: AgentParams): Agent =>
+/**
+ * Make an agent with tools, model, and system prompt
+ * @param params agent params
+ * @returns agent
+ */
+export const makeAgent = (params: AgentParams): Agent =>
   async function* (message: string): AsyncGenerator<AgentOutputChunk> {
+    const {
+      tools,
+      model,
+      openAI,
+      systemPrompt = DEFAULT_SYSTEM_PROMPT,
+      maxIterations = DEFAULT_MAX_ITERATIONS,
+    } = params;
+
     // Initialize message history
     const messages: OpenAI.ChatCompletionMessageParam[] = [
       { role: "system", content: systemPrompt },
       { role: "user", content: message },
     ];
 
-    const toolMap = tools.reduce(
-      (acc, tool) => {
-        if (tool.definition.function) {
-          acc[tool.definition.function.name] = tool;
-        }
-        return acc;
-      },
-      {} as Record<
-        string,
-        {
-          definition: OpenAI.ChatCompletionTool;
-          call: (parameters: string) => Promise<string>;
-        }
-      >
-    );
+    const toolMap = tools.reduce((acc, tool) => {
+      if (tool.definition.function) {
+        acc[tool.definition.function.name] = tool;
+      }
+      return acc;
+    }, {} as Record<string, Tool>);
 
-    let hasMoreIterations = true;
-    while (hasMoreIterations) {
+    let iterations = 0;
+    while (iterations < maxIterations) {
+      iterations++;
       const assistantMessage: OpenAI.ChatCompletionAssistantMessageParam = {
         role: "assistant",
         content: "",
@@ -131,16 +140,16 @@ export const makeAgent = ({
 
       messages.push(assistantMessage);
 
-      hasMoreIterations = false;
+      let hasToolCall = false;
 
       for await (const chunk of chunks) {
         if (isTextChunk(chunk)) {
           assistantMessage.content += chunk.content;
           yield chunk;
         } else if (isToolCallRequest(chunk)) {
+          hasToolCall = true;
           yield chunk;
 
-          hasMoreIterations = true;
           const tool = toolMap[chunk.name];
           if (tool) {
             if (!assistantMessage.tool_calls) {
@@ -163,6 +172,9 @@ export const makeAgent = ({
             yield toolCallResponse(chunk.id, result);
           }
         }
+      }
+      if (!hasToolCall) {
+        break;
       }
     }
   };
