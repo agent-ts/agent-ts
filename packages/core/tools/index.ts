@@ -1,45 +1,18 @@
-import type { OpenAI } from "openai";
-import { parse, type Schema, type ValueOf } from "./schema";
+// Re-export functions
+export { makeTool } from './tools';
+export { schema, parse, safeParse } from './schema';
 
-export type Tool = {
-  definition: OpenAI.ChatCompletionTool;
-  call: (parameters: string) => Promise<string>;
-};
-
-export type ToolProps<T extends Schema> = {
-  name: string;
-  description: string;
-  schema: T;
-  call: (parameters: ValueOf<T>) => Promise<string>;
-}
-
-export const makeTool = <T extends Schema>({
-  name,
-  description,
-  schema,
-  call,
-}: ToolProps<T>): Tool => {
-  return {
-    definition: {
-      type: "function",
-      function: {
-        name,
-        description,
-        parameters: schema
-      },
-    },
-    call: async (paramString: string) => {
-      try {
-        const paramObj = parse(schema, JSON.parse(paramString));
-        return await call(paramObj).then(JSON.stringify);
-      } catch (error) {
-        return JSON.stringify({
-          error,
-        });
-      }
-    },
-  };
-};
-
-export { schema, ParseError } from "./schema";
-export type { ParseResult, Schema, ValueOf } from "./schema";
+// Re-export types
+export type { Tool, ToolParams } from './tools';
+export type {
+  Schema,
+  ValueOf,
+  StringSchema,
+  NumberSchema,
+  IntegerSchema,
+  BooleanSchema,
+  NullSchema,
+  ArraySchema,
+  ObjectSchema,
+  ParseError,
+} from "./schema";

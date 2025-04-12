@@ -1,10 +1,10 @@
+import { makeAgent } from "./agent";
 import {
-  makeAgent,
-  NEW_ITERATION,
-  TEXT_CHUNK,
-  TOOL_CALL_REQUEST,
-  TOOL_CALL_RESPONSE,
-} from "./index";
+  isNewIteration,
+  isTextChunk,
+  isToolCallRequest,
+  isToolCallResponse,
+} from "./chunks";
 import { OpenAI } from "openai";
 import vm from "node:vm";
 import { makeTool, schema } from "./tools";
@@ -17,7 +17,8 @@ const openAI = new OpenAI({
 const tools = [
   makeTool({
     name: "execute_script",
-    description: "Execute JavaScript code in sandbox without network access, write the result to the global variable 'result', you can write code to get the information you need",
+    description:
+      "Execute JavaScript code in sandbox without network access, write the result to the global variable 'result', you can write code to get the information you need",
     schema: schema({
       type: "object",
       properties: {
@@ -30,14 +31,13 @@ const tools = [
     }),
     call: async ({ script }) => {
       const context: { result: string | null } = { result: null };
-      console.log(script)
+      console.log(script);
       const sc = new vm.Script(script);
       sc.runInNewContext(context);
       return context.result ?? "No result";
-    }
+    },
   }),
 ];
-
 
 const agent = makeAgent({
   tools,
@@ -46,14 +46,16 @@ const agent = makeAgent({
   systemPrompt: "You are a helpful assistant.",
 });
 
-for await (const chunk of agent("计算一下房贷利息，贷款 300万，30年，年利率 3.8%。并编程验证。")) {
-  if (chunk.type === NEW_ITERATION) {
+for await (const chunk of agent(
+  "计算一下房贷利息，贷款 300万，30年，年利率 3.8%。并编程验证。"
+)) {
+  if (isNewIteration(chunk)) {
     console.log("-".repeat(20));
-  } else if (chunk.type === TEXT_CHUNK) {
+  } else if (isTextChunk(chunk)) {
     console.write(chunk.content);
-  } else if (chunk.type === TOOL_CALL_REQUEST) {
+  } else if (isToolCallRequest(chunk)) {
     console.log(`\nTool call: ${chunk.name}(${chunk.arguments})`);
-  } else if (chunk.type === TOOL_CALL_RESPONSE) {
+  } else if (isToolCallResponse(chunk)) {
     console.log(`\nTool call response: ${chunk.result}`);
   }
 }
