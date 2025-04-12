@@ -46,7 +46,7 @@ const agent = makeAgent({
   systemPrompt: "You are a helpful assistant.",
 });
 
-for await (const chunk of agent("历史上的今天发生过那些大事？可以变成获取时间。")) {
+for await (const chunk of agent("计算一下房贷利息，贷款 300万，30年，年利率 3.8%。并编程验证。")) {
   if (chunk.type === NEW_ITERATION) {
     console.log("-".repeat(20));
   } else if (chunk.type === TEXT_CHUNK) {
