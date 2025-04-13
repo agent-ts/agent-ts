@@ -5,19 +5,24 @@ import {
   isTextChunk,
   isToolCallRequest,
   isToolCallResponse,
+  DEFAULT_SYSTEM_PROMPT,
 } from "@agent-ts/core";
 import { scriptingTool } from "..";
 
 
 const openAI = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  baseURL: process.env.OPENAI_API_URL,
+  apiKey: process.env.OPENAI_API_KEY || "",
+  baseURL: process.env.OPENAI_API_URL || "https://api.openai.com/v1",
 });
 
 const agent = makeAgent({
   tools: [scriptingTool],
-  model: 'deepseek-chat',
+  model: process.env.OPENAI_MODEL || "gpt-4o",
   openAI,
+  systemPrompt: `
+  ${DEFAULT_SYSTEM_PROMPT}
+  Please do at least 1 rounds of introspection on your previous response.
+  `,
 });
 
 export const ask = async (message: string) => {

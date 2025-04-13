@@ -1,6 +1,7 @@
 import { type OpenAI } from "openai";
-import { type Tool } from "./tools";
+import { makeTool, makeInternalTool } from "./tools";
 import { DEFAULT_SYSTEM_PROMPT, DEFAULT_MAX_ITERATIONS } from "./constants";
+import type { Tool, InternalTool } from "./tools";
 import type { AgentOutputChunk, ToolCallRequest, TextChunk } from "./chunks";
 
 import {
@@ -85,29 +86,44 @@ export type AgentParams = {
   maxIterations?: number;
 };
 
-type InternalTool = {
-  definition: OpenAI.ChatCompletionTool;
-  call: (
-    messages: OpenAI.ChatCompletionMessageParam[],
-    id: string,
-    parameters: string
-  ) => Promise<string>;
-};
-
-function makeInternalTool(tool: Tool): InternalTool {
+/**
+ * Make a context for the agent
+ * @param initialMessages initial messages
+ * @returns messages and prune tool
+ */
+const makeContext = (initialMessages: OpenAI.ChatCompletionMessageParam[]): {
+  messages: OpenAI.ChatCompletionMessageParam[];
+  pruneTool: InternalTool;
+} => {
+  const messages = [...initialMessages];
+  const pruneTool = makeTool({
+    name: "prune",
+    description: "Prune the message history and keep only the key information",
+    schema: schema({
+      type: "object",
+      properties: {
+        content: { type: "string" },
+      },
+      required: ["content"],
+    }),
+    call: async ({ content }) =>
+      `The message history has been pruned. Here are the key points:\n${content}`,
+  });
   return {
-    definition: tool.definition,
-    call: async (messages, id, parameters) => {
-      const result = await tool.call(parameters);
-      messages.push({
-        role: "tool",
-        content: result,
-        tool_call_id: id,
-      });
-      return result;
+    messages,
+    pruneTool: {
+      definition: pruneTool.definition,
+      call: async (messages, id, parameters) => {
+        messages.splice(initialMessages.length);
+        const content = await pruneTool.call(parameters);
+        messages.push({ role: "system", content });
+        return content;
+      },
     },
   };
-}
+};
+
+
 
 /**
  * Make an agent with tools, model, and system prompt
@@ -124,29 +140,12 @@ export const makeAgent = (params: AgentParams): Agent =>
     } = params;
 
     // Initialize message history
-    const messages: OpenAI.ChatCompletionMessageParam[] = [
+    const { pruneTool, messages } = makeContext([
       { role: "system", content: systemPrompt },
       { role: "user", content: message },
-    ];
+    ]);
 
-    const initialLength = messages.length;
-
-    const tools: InternalTool[] = [...params.tools.map(makeInternalTool), {
-      definition: {
-        type: "function",
-        function: {
-          name: "@prune",
-          description: "Prune the message history and keep only the key information",
-          parameters: schema({ type: "string" }),
-        },
-      },
-      call: async (messages, id, parameters) => {
-        messages.splice(initialLength);
-        const content = `The message history has been pruned. Here are the key points:\n${parameters}`;
-        messages.push({ role: "system", content });
-        return content;
-      },
-    }];
+    const tools: InternalTool[] = [...params.tools.map(makeInternalTool), pruneTool];
 
     const toolMap = tools.reduce((acc, tool) => {
       if (tool.definition.function) {

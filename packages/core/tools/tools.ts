@@ -40,3 +40,27 @@ export const makeTool = <T extends Schema>({
     },
   };
 };
+
+export type InternalTool = {
+  definition: OpenAI.ChatCompletionTool;
+  call: (
+    messages: OpenAI.ChatCompletionMessageParam[],
+    id: string,
+    parameters: string
+  ) => Promise<string>;
+};
+
+export function makeInternalTool(tool: Tool): InternalTool {
+  return {
+    definition: tool.definition,
+    call: async (messages, id, parameters) => {
+      const result = await tool.call(parameters);
+      messages.push({
+        role: "tool",
+        content: result,
+        tool_call_id: id,
+      });
+      return result;
+    },
+  };
+}
