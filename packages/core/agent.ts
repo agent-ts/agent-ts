@@ -11,6 +11,7 @@ import {
   isToolCallRequest,
   isTextChunk,
 } from "./chunks";
+import { schema } from "./tools/schema";
 
 /**
  * Collect tool call request segments in each chunk, and combine them into complete tool call requests
@@ -84,6 +85,30 @@ export type AgentParams = {
   maxIterations?: number;
 };
 
+type InternalTool = {
+  definition: OpenAI.ChatCompletionTool;
+  call: (
+    messages: OpenAI.ChatCompletionMessageParam[],
+    id: string,
+    parameters: string
+  ) => Promise<string>;
+};
+
+function makeInternalTool(tool: Tool): InternalTool {
+  return {
+    definition: tool.definition,
+    call: async (messages, id, parameters) => {
+      const result = await tool.call(parameters);
+      messages.push({
+        role: "tool",
+        content: result,
+        tool_call_id: id,
+      });
+      return result;
+    },
+  };
+}
+
 /**
  * Make an agent with tools, model, and system prompt
  * @param params agent params
@@ -92,7 +117,6 @@ export type AgentParams = {
 export const makeAgent = (params: AgentParams): Agent =>
   async function* (message: string): AsyncGenerator<AgentOutputChunk> {
     const {
-      tools,
       model,
       openAI,
       systemPrompt = DEFAULT_SYSTEM_PROMPT,
@@ -105,12 +129,31 @@ export const makeAgent = (params: AgentParams): Agent =>
       { role: "user", content: message },
     ];
 
+    const initialLength = messages.length;
+
+    const tools: InternalTool[] = [...params.tools.map(makeInternalTool), {
+      definition: {
+        type: "function",
+        function: {
+          name: "@prune",
+          description: "Prune the message history and keep only the key information",
+          parameters: schema({ type: "string" }),
+        },
+      },
+      call: async (messages, id, parameters) => {
+        messages.splice(initialLength);
+        const content = `The message history has been pruned. Here are the key points:\n${parameters}`;
+        messages.push({ role: "system", content });
+        return content;
+      },
+    }];
+
     const toolMap = tools.reduce((acc, tool) => {
       if (tool.definition.function) {
         acc[tool.definition.function.name] = tool;
       }
       return acc;
-    }, {} as Record<string, Tool>);
+    }, {} as Record<string, InternalTool>);
 
     let iterations = 0;
     while (iterations < maxIterations) {
@@ -124,18 +167,13 @@ export const makeAgent = (params: AgentParams): Agent =>
 
       const chunks = runAgenticIteration(
         openAI,
-        tools.length > 0
-          ? {
-              model,
-              messages,
-              tools: tools.map((tool) => tool.definition),
-              tool_choice: "auto",
-              parallel_tool_calls: true,
-            }
-          : {
-              model,
-              messages,
-            }
+        {
+          model,
+          messages,
+          tools: tools.map((tool) => tool.definition),
+          tool_choice: "auto",
+          parallel_tool_calls: true,
+        }
       );
 
       messages.push(assistantMessage);
@@ -163,12 +201,7 @@ export const makeAgent = (params: AgentParams): Agent =>
                 arguments: chunk.arguments,
               },
             });
-            const result = await tool.call(chunk.arguments);
-            messages.push({
-              role: "tool",
-              content: result,
-              tool_call_id: chunk.id,
-            });
+            const result = await tool.call(messages, chunk.id, chunk.arguments);
             yield toolCallResponse(chunk.id, result);
           }
         }
