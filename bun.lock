@@ -6,10 +6,19 @@
     },
     "packages/core": {
       "name": "@agent-ts/core",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "devDependencies": {
         "@types/bun": "latest",
         "openai": "^4.90.0",
+      },
+    },
+    "packages/schema": {
+      "name": "@agent-ts/schema",
+      "devDependencies": {
+        "@types/bun": "latest",
+      },
+      "peerDependencies": {
+        "typescript": "^5",
       },
     },
     "packages/scripting-tool": {
@@ -28,6 +37,8 @@
   },
   "packages": {
     "@agent-ts/core": ["@agent-ts/core@workspace:packages/core"],
+
+    "@agent-ts/schema": ["@agent-ts/schema@workspace:packages/schema"],
 
     "@agent-ts/scripting-tool": ["@agent-ts/scripting-tool@workspace:packages/scripting-tool"],
 
