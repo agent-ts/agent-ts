@@ -123,8 +123,6 @@ const makeContext = (initialMessages: OpenAI.ChatCompletionMessageParam[]): {
   };
 };
 
-
-
 /**
  * Make an agent with tools, model, and system prompt
  * @param params agent params

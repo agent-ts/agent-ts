@@ -4,6 +4,15 @@
     "": {
       "name": "agent-ts",
     },
+    "packages/agent": {
+      "name": "@agent-ts/agent",
+      "devDependencies": {
+        "@types/bun": "latest",
+      },
+      "peerDependencies": {
+        "typescript": "^5",
+      },
+    },
     "packages/core": {
       "name": "@agent-ts/core",
       "version": "0.0.2",
@@ -34,13 +43,29 @@
         "typescript": "^5",
       },
     },
+    "packages/tool": {
+      "name": "@agent-ts/tool",
+      "dependencies": {
+        "@agent-ts/schema": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+      },
+      "peerDependencies": {
+        "typescript": "^5",
+      },
+    },
   },
   "packages": {
+    "@agent-ts/agent": ["@agent-ts/agent@workspace:packages/agent"],
+
     "@agent-ts/core": ["@agent-ts/core@workspace:packages/core"],
 
     "@agent-ts/schema": ["@agent-ts/schema@workspace:packages/schema"],
 
     "@agent-ts/scripting-tool": ["@agent-ts/scripting-tool@workspace:packages/scripting-tool"],
+
+    "@agent-ts/tool": ["@agent-ts/tool@workspace:packages/tool"],
 
     "@types/bun": ["@types/bun@1.2.9", "", { "dependencies": { "bun-types": "1.2.9" } }, "sha512-epShhLGQYc4Bv/aceHbmBhOz1XgUnuTZgcxjxk+WXwNyDXavv5QHD1QEFV0FwbTSQtNq6g4ZcV6y0vZakTjswg=="],
 
