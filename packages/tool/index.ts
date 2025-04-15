@@ -4,7 +4,7 @@ import { parse, schema } from "@agent-ts/schema";
 
 export type Tool = {
   definition: OpenAI.ChatCompletionTool;
-  invoke: (paramString: string, trace: (chunk: string) => void) => Promise<string>;
+  invoke: (paramString: string) => Promise<string>;
 };
 
 export type ToolParams<I extends Schema, O extends Schema> = {
@@ -12,7 +12,7 @@ export type ToolParams<I extends Schema, O extends Schema> = {
   description: string;
   inputSchema: I;
   outputSchema: O;
-  invoke: (parameters: ValueOf<I>, trace: (chunk: string) => void) => Promise<ValueOf<O>>;
+  invoke: (parameters: ValueOf<I>) => Promise<ValueOf<O>>;
 };
 
 export const makeTool = <I extends Schema, O extends Schema>({
@@ -31,10 +31,10 @@ export const makeTool = <I extends Schema, O extends Schema>({
         parameters: inputSchema,
       },
     },
-    invoke: async (paramString: string, trace: (chunk: string) => void) => {
+    invoke: async (paramString: string) => {
       try {
         const paramObj = parse(inputSchema, JSON.parse(paramString));
-        const result = await invoke(paramObj, trace);
+        const result = await invoke(paramObj);
         return JSON.stringify(result);
       } catch (error) {
         return JSON.stringify({ error });

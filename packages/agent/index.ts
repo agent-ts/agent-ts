@@ -38,10 +38,7 @@ const agent = ({
     description: "Agent",
     inputSchema,
     outputSchema,
-    invoke: async (
-      parameters: ValueOf<typeof inputSchema>,
-      trace: (chunk: string) => void
-    ) => {
+    invoke: async (parameters: ValueOf<typeof inputSchema>) => {
       const response = await openAI.chat.completions.create({
         model,
         messages: [{ role: "user", content: parameters.message }],
